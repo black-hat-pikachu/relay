@@ -39,11 +39,10 @@ And it's not always easy to understand the mechanics of all processes that are h
 
 Fortunately, there are tools that aim to simplify the process of writing tests for Relay components, by providing imperative APIs for controlling the request/response flow and additional API for mock data generation.
 
-There are two main modules that you may use in your tests:
+There are two main Relay modules that you may use in your tests:
 
 * `createMockEnvironment(options): RelayMockEnvironment`
 * `MockPayloadGenerator` and the `@relay_test_operation` directive
-
 
 With `createMockEnvironment,` you will be able to create an instance of `RelayMockEnvironment`, a Relay environment specifically for your tests. The instance created by `createMockEnvironment` implements the Relay Environment Interface and it also has an additional Mock layer, with methods that allow you to resolve/reject and control the flow of operations (queries/mutations/subscriptions).
 
@@ -53,6 +52,15 @@ One of the patterns you may see in the tests for Relay components: 95% of the te
 
 With the `MockPayloadGenerator` and `@relay_test_operation`, we want to get rid of this pattern and switch the developer's focus from the preparation of the test to the actual testing.
 
+## Testing with React and Relay
+
+**[React Testing Library](https://testing-library.com/react)** is a set of helpers that let you test React components without relying on their implementation details. This approach makes refactoring a breeze and also nudges you towards best practices for accessibility. Although it doesn't provide a way to "shallowly" render a component without its children, a test runner like Jest lets you do this by [mocking](https://reactjs.org/docs/testing-recipes.html#mocking-modules).
+
+<FbInternalOnly>
+
+Note: The [`ReactTestRenderer`](https://www.npmjs.com/package/react-test-renderer) library has been deprecated since React v18. `ReactTestRenderer` may still be referenced internally as an alternative to React Testing Library. However, when possible, we recommend using React Testing Library (or `@testing-library/react-native`) to test your React applications with Relay.
+
+</FbInternalOnly>
 
 ## RelayMockEnvironment API Overview
 
@@ -196,31 +204,30 @@ const {
   createMockEnvironment,
   MockPayloadGenerator,
 } = require('relay-test-utils');
+const {act, render} = require('@testing-library/react');
 
 // Relay may trigger 3 different states
 // for this component: Loading, Error, Data Loaded
 // Here is examples of tests for those states.
-test('Loading State', () => {
+test('Loading State', async () => {
   const environment = createMockEnvironment();
-  const renderer = ReactTestRenderer.create(
+  const renderer = render(
     <MyAwesomeViewRoot environment={environment} />,
   );
 
   // Here we just verify that the spinner is rendered
-  expect(
-    renderer.root.find(node => node.props['data-testid'] === 'spinner'),
-  ).toBeDefined();
+  expect(await renderer.findByTestId('spinner')).toBeDefined();
 });
 
-test('Data Render', () => {
+test('Data Render', async () => {
   const environment = createMockEnvironment();
-  const renderer = ReactTestRenderer.create(
+  const renderer = render(
     <MyAwesomeViewRoot environment={environment} />,
   );
 
-  // Wrapping in ReactTestRenderer.act will ensure that components
+  // Wrapping in act will ensure that components
   // are fully updated to their final state.
-  ReactTestRenderer.act(() => {
+  act(() => {
     environment.mock.resolveMostRecentOperation(operation =>
       MockPayloadGenerator.generate(operation),
     );
@@ -228,31 +235,91 @@ test('Data Render', () => {
 
   // At this point operation will be resolved
   // and the data for a query will be available in the store
-  expect(
-    renderer.root.find(node => node.props['data-testid'] === 'myButton'),
-  ).toBeDefined();
+  expect(await renderer.findByTestId('myButton')).toBeDefined();
 });
 
-test('Error State', () => {
+test('Error State', async () => {
   const environment = createMockEnvironment();
-  const renderer = ReactTestRenderer.create(
+  const renderer = render(
     <MyAwesomeViewRoot environment={environment} />,
   );
 
-  // Wrapping in ReactTestRenderer.act will ensure that components
+  // Wrapping in act will ensure that components
   // are fully updated to their final state.
-  ReactTestRenderer.act(() => {
+  act(() => {
     // Error can be simulated with `rejectMostRecentOperation`
     environment.mock.rejectMostRecentOperation(new Error('Uh-oh'));
   });
 
-  expect(
-    renderer.root.find(item => (item.props.testID = 'errorMessage')),
-  ).toBeDefined();
+  expect(await renderer.findByTestId('errorMessage')).toBeDefined();
 });
 ```
 
+#### Component Tests With Deferred Fragments
 
+When using `MockPayloadGenerator` to generate data for a Query that has fragments with `@defer` you may want to generate the deferred data as well. To do so, you can use `MockPayloadGenerator.generateWithDefer` passing the option `generateDeferredPayload`:
+
+```javascript
+// Say you have a component with useFragment
+const ChildComponent = (props: {user: ChildComponentFragment_user$key}) => {
+  const data = useFragment(graphql`
+  fragment ChildComponentFragment_user on User {
+    name
+  }
+  `, props.user);
+  return <View>{data?.name}</View>;
+};
+
+// Say you have a parent component that fetches data with useLazyLoadQuery and `@defer`s the data for the ChildComponent.
+const ParentComponent = () => {
+  const data = useLazyLoadQuery(graphql`
+  query ParentComponentQuery {
+    user {
+      id
+      ...ChildComponentFragment_user @defer
+    }
+  }
+  `, {});
+  return (
+    <View>
+      {id}
+      <Suspense fallback={null}>
+        {data?.user && <ChildComponent user={data.user} />}
+      </Suspense>
+    </View>
+  );
+};
+
+const {
+  createMockEnvironment,
+  MockPayloadGenerator,
+} = require('relay-test-utils');
+const {act, render} = require('@testing-library/react');
+
+test('Data Render with @defer', () => {
+  const environment = createMockEnvironment();
+  const renderer = render(
+    <RelayEnvironmentProvider environment={environment}>
+      <ParentComponent />,
+    </RelayEnvironmentProvider>
+  );
+
+  // Wrapping in ReactTestRenderer.act will ensure that components
+  // are fully updated to their final state.
+  act(() => {
+    const operation = environment.mock.getMostRecentOperation();
+    const mockData = MockPayloadGenerator.generateWithDefer(operation, null, {generateDeferredPayload: true});
+    environment.mock.resolve(mockData);
+
+    // You may need this to make sure all payloads are retrieved
+    jest.runAllTimers();
+  });
+
+  // At this point operation will be resolved
+  // and the data for a query will be available in the store
+  expect(renderer.container.textContent).toEqual(['id', 'name']);
+});
+```
 
 ### Fragment Component Tests
 
@@ -276,7 +343,7 @@ test('Fragment', () => {
     return <MyFragmentComponent myData={data.myData} />
   };
 
-  const renderer = ReactTestRenderer.create(
+  const renderer = render(
     <RelayEnvironmentProvider environment={environment}>
       <Suspense fallback="Loading...">
         <TestRenderer />
@@ -284,9 +351,9 @@ test('Fragment', () => {
     </RelayEnvironmentProvider>
   );
 
-  // Wrapping in ReactTestRenderer.act will ensure that components
+  // Wrapping in act will ensure that components
   // are fully updated to their final state.
-  ReactTestRenderer.act(() => {
+  act(() => {
     environment.mock.resolveMostRecentOperation(operation =>
       MockPayloadGenerator.generate(operation),
     );
@@ -302,7 +369,7 @@ Essentially, tests for pagination components (e.g. using `usePaginationFragment`
 
 ```js
 // Pagination Example
-test('`Pagination` Container', () => {
+test('`Pagination` Container', async () => {
   const environment = createMockEnvironment();
   const TestRenderer = () => {
     const data = useLazyLoadQuery(
@@ -321,7 +388,7 @@ test('`Pagination` Container', () => {
     return <MyPaginationContainer connection={data.myConnection.connection} />
   };
 
-  const renderer = ReactTestRenderer.create(
+  const renderer = render(
     <RelayEnvironmentProvider environment={environment}>
       <Suspense fallback="Loading...">
         <TestRenderer />
@@ -329,9 +396,9 @@ test('`Pagination` Container', () => {
     </RelayEnvironmentProvider>
   );
 
-  // Wrapping in ReactTestRenderer.act will ensure that components
+  // Wrapping in act will ensure that components
   // are fully updated to their final state.
-  ReactTestRenderer.act(() => {
+  act(() => {
     environment.mock.resolveMostRecentOperation(operation =>
       MockPayloadGenerator.generate(operation, {
         ID(_, generateId) {
@@ -350,13 +417,13 @@ test('`Pagination` Container', () => {
   });
 
   // Let's find a `loadMore` button and click on it to initiate pagination request, for example
-  const loadMore = renderer.root.find(node => node.props['data-testid'] === 'loadMore')
+  const loadMore = await renderer.findByTestId('loadMore');
   expect(loadMore.props.disabled).toBe(false);
   loadMore.props.onClick();
 
-  // Wrapping in ReactTestRenderer.act will ensure that components
+  // Wrapping in act will ensure that components
   // are fully updated to their final state.
-  ReactTestRenderer.act(() => {
+  act(() => {
     environment.mock.resolveMostRecentOperation(operation =>
       MockPayloadGenerator.generate(operation, {
         ID(_, generateId) {
@@ -382,7 +449,7 @@ test('`Pagination` Container', () => {
 We can use similar approach here with wrapping the component with a query. And for the sake of completeness, we will add an example here:
 
 ```js
-test('Refetch Container', () => {
+test('Refetch Container', async () => {
   const environment = createMockEnvironment();
   const TestRenderer = () => {
     const data = useLazyLoadQuery(
@@ -399,7 +466,7 @@ test('Refetch Container', () => {
     return <MyRefetchContainer data={data.myData} />
   };
 
-  const renderer = ReactTestRenderer.create(
+  const renderer = render(
     <RelayEnvironmentProvider environment={environment}>
       <Suspense fallback="Loading...">
         <TestRenderer />
@@ -407,19 +474,19 @@ test('Refetch Container', () => {
     </RelayEnvironmentProvider>
   );
 
-  ReactTestRenderer.act(() => {
+  act(() => {
     environment.mock.resolveMostRecentOperation(operation =>
       MockPayloadGenerator.generate(operation),
     );
   });
 
   // Assuming we have refetch button in the Container
-  const refetchButton = renderer.root.find(node => node.props['data-testid'] === 'refetch');
+  const refetchButton = await renderer.findByTestId('refetch');
 
   // This should trigger the `refetch`
   refetchButton.props.onClick();
 
-  ReactTestRenderer.act(() => {
+  act(() => {
     environment.mock.resolveMostRecentOperation(operation =>
       MockPayloadGenerator.generate(operation, {
         // We can customize mock resolvers, to change the output of the refetch query
@@ -459,7 +526,7 @@ test('it should send mutation', () => {
   sendMutation(environment, onCompleted, jest.fn(), {});
   const operation = environment.mock.getMostRecentOperation();
 
-  ReactTestRenderer.act(() => {
+  act(() => {
     environment.mock.resolve(
       operation,
       MockPayloadGenerator.generate(operation)
@@ -472,7 +539,9 @@ test('it should send mutation', () => {
 
 ### Subscription
 
-> The `useSubscription` API is an improvement over calling `requestSubscription` directly.
+:::tip
+The `useSubscription` API is an improvement over calling `requestSubscription` directly.
+:::
 
 We can test subscriptions similarly to how we test mutations.
 
@@ -494,7 +563,7 @@ test('it should subscribe', () => {
   subscribe(environment, onNext, jest.fn(), {});
   const operation = environment.mock.getMostRecentOperation();
 
-  ReactTestRenderer.act(() => {
+  act(() => {
     environment.mock.nextValue(
       operation,
       MockPayloadGenerator.generate(operation)
@@ -505,10 +574,7 @@ test('it should subscribe', () => {
 });
 ```
 
-
-
 ### Example with `queueOperationResolver`
-
 
 With `queueOperationResolver` it is possible to define responses for operations that will be executed on the environment
 
@@ -520,35 +586,31 @@ const {
   MockPayloadGenerator,
 } = require('relay-test-utils');
 
-test('Data Render', () => {
+test('Data Render', async () => {
   const environment = createMockEnvironment();
   environment.mock.queueOperationResolver(operation =>
     MockPayloadGenerator.generate(operation),
   );
 
-  const renderer = ReactTestRenderer.create(
+  const renderer = render(
     <MyAwesomeViewRoot environment={environment} />,
   );
 
   // At this point operation will be resolved
   // and the data for a query will be available in the store
-  expect(
-    renderer.root.find(node => node.props['data-testid'] === 'myButton'),
-  ).toBeDefined();
+  expect(await renderer.findByTestId('myButton')).toBeDefined();
 });
 
-test('Error State', () => {
+test('Error State', async () => {
   const environment = createMockEnvironment();
   environment.mock.queueOperationResolver(() =>
     new Error('Uh-oh'),
   );
-  const renderer = ReactTestRenderer.create(
+  const renderer = render(
     <MyAwesomeViewRoot environment={environment} />,
   );
 
-  expect(
-    renderer.root.find(item => (item.props.testID = 'errorMessage')),
-  ).toBeDefined();
+  expect(await renderer.findByTestId('myButton')).toBeDefined();
 });
 ```
 
@@ -556,13 +618,9 @@ test('Error State', () => {
 
 The examples in this guide should work for testing components both with Relay Hooks, Containers or Renderers. When writing tests that involve the `usePreloadedQuery` hook, please also see the `queuePendingOperation` note above.
 
-### toMatchSnaphot(...)
+### toMatchSnapshot(...)
 
 Even though in all of the examples here you can see assertions with `toMatchSnapshot()`, we keep it that way just to make examples concise. But it's not the recommended way to test your components.
-
-**[React Testing Library](https://testing-library.com/react)** is a set of helpers that let you test React components without relying on their implementation details. This approach makes refactoring a breeze and also nudges you towards best practices for accessibility. Although it doesn't provide a way to "shallowly" render a component without its children, a test runner like Jest lets you do this by [mocking](https://reactjs.org/docs/testing-recipes.html#mocking-modules).
-
-
 
 ### More Examples
 

@@ -40,18 +40,6 @@ This capability is useful for components to express asynchronous dependencies li
   <FbSuspenseMoreInfo />
 </FbInternalOnly>
 
-<OssOnly>
-
-:::caution
-Note that this **DOES NOT** mean that "Suspense for Data Fetching" is ready for general implementation and adoption yet. **Support, general guidance, and requirements for usage of Suspense for Data Fetching are still not ready**, and the React team is still defining what this guidance will be for upcoming React releases.
-
-Even though there will be some limitations when Suspense is used in React 17, Relay Hooks are stable and on the trajectory for supporting upcoming releases of React.
-
-For more information, see our **[Suspense Compatibility](../../../migration-and-compatibility/suspense-compatibility/)** guide.
-:::
-
-</OssOnly>
-
 ## Loading fallbacks with Suspense Boundaries
 
 When a component is suspended, we need to render a *fallback* in place of the component while we wait for it to become *"ready"*. In order to do so, we use the `Suspense` component provided by React:
@@ -252,6 +240,6 @@ Fragments are also integrated with Suspense in order to support rendering of dat
   <FbSuspenseInRelayTransitions />
 </FbInternalOnly>
 
-Additionally, our APIs for refetching ([Refreshing and Refetching](../../refetching/)) and for [rendering connections](../../list-data/connections/) are also integrated with Suspense; for these use cases, these APIs will also suspend.
+Additionally, our APIs for fetching ([Refreshing and Refetching](../list-data/introduction.md)) and for [rendering connections](../../list-data/connections/) are also integrated with Suspense; for these use cases, these APIs will also suspend.
 
 <DocsRating />

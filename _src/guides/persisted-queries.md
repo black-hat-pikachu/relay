@@ -12,11 +12,13 @@ import {FbInternalOnly, OssOnly} from 'docusaurus-plugin-internaldocs-fb/interna
 
 <FbInternalOnly>
 
-> Persistence is handled by the `relay` command for you. You likely do not need to worry about the contents of this guide.
+:::tip
+At Meta, persistence is handled by the `relay` command for you. You likely do not need to worry about the contents of this guide.
+:::
 
 </FbInternalOnly>
 
-The relay compiler supports persisted queries. This is useful because:
+The Relay compiler supports persisted queries. This is useful because:
 
 -   The client operation text becomes just an md5 hash which is usually shorter than the real
     query string. This saves upload bytes from the client to the server.
@@ -30,7 +32,7 @@ The relay compiler supports persisted queries. This is useful because:
 
 ### The `persistConfig` option
 
-In your relay configiration section in `package.json` you'll need specify
+In the `relay` configuration section of your `package.json` you'll need specify
 "persistConfig".
 
 ```
@@ -48,7 +50,7 @@ In your relay configiration section in `package.json` you'll need specify
 }
 ```
 
-Specifiying `persistConfig` in the config will do the following:
+Specifying `persistConfig` in the config will do the following:
 
 1.  It converts all query and mutation operation texts to md5 hashes.
 
@@ -132,7 +134,7 @@ Ideally, you'll take this file and ship it to your server at deploy time so your
 - ❌ When there's a cache miss, it'll cost you an extra round trip to the server.
 - ❌ You'll have to ship your `persisted_queries.json` file to the browser which will increase your bundle size.
 
-### Example implemetation of `relayLocalPersisting.js`
+### Example implementation of `relayLocalPersisting.js`
 
 Here's an example of a simple persist server that will save query text to the `queryMap.json` file.
 

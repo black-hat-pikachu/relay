@@ -104,6 +104,9 @@ const StoryFragment = graphql`
 `;
 ```
 
+Run `npm run relay` again to generate the new
+Relay artifacts and get rid of the errors in your editor.
+
 At this point, you should see up to three comments on each story. Some stories have more than three comments, and these will show a "Load more" button, although it isn't hooked up yet:
 
 ![Screenshot of a story with the first three comments and a Load More button](/img/docs/tutorial/connections-comments-initial-screenshot.png)
@@ -111,6 +114,8 @@ At this point, you should see up to three comments on each story. Some stories h
 Now go to `StoryCommentsSection` and take a look:
 
 ```
+import LoadMoreCommentsButton from "./LoadMoreCommentsButton";
+
 const StoryCommentsSectionFragment = graphql`
  fragment StoryCommentsSectionFragment on Story {
   // color1
@@ -145,7 +150,7 @@ function StoryCommentsSection({story}) {
 
 Here we see that `StoryCommentsSection` is selecting the <span className="color1">first three comments</span> for each story using the Connection schema convention: the `comments` field accepts the page size as an argument, and for each comment there is an `edge` and within that a `node` containing the actual comment data — we’re spreading in `CommentFragment` here to retrieve the data needed to show an individual comment with the `Comment` component. It also uses the `pageInfo` field of the connection to decide whether to show a “Load More” button.
 
-Our task then is to make the “Load More” button actually load an additional page of comments. Relay handles the gritty details for us, but we do have to supply a few steps to set it up.
+Our task then is to make the “Load More” button actually load an additional page of comments. Relay handles the nitty-gritty details for us, but we do have to supply a few steps to set it up.
 
 ### Augmenting the Fragment
 
@@ -236,23 +241,20 @@ const {data, loadNext} = usePaginationFragment(StoryCommentsSectionFragment, sto
 const onLoadMore = () => loadNext(3);
 ```
 
-Now the Load More button should cause another three comments to be loaded.
+Run `npm run relay`. Now the Load More button should cause another three comments to be loaded.
 
-### Improving the Loading Experience with useTransition
+### Improving the Loading Experience
 
 As it stands, there’s no user feedback when you click the “Load More” button until the new comments have finished loading and then appear. Every user action should result in immediate feedback, so let’s show a spinner while the new data is loading — but without hiding the existing UI.
 
-To do that, we need to wrap our call to `loadNext` inside a React transition. Here’s the change’s we need to make:
+To do that, we need can use the `isLoadingNext` boolean value returned from `usePaginationFragment`. Here are the changes we need to make:
 
 ```
+import SmallSpinner from "./SmallSpinner";
+
 function StoryCommentsSection({story}) {
   // change-line
-  const [isPending, startTransition] = useTransition();
-  const {data, loadNext} = usePaginationFragment(StoryCommentsSectionFragment, story);
-  // change
-  const onLoadMore = () => startTransition(() => {
-    loadNext(3);
-  });
+  const {data, loadNext, isLoadingNext} = usePaginationFragment(StoryCommentsSectionFragment, story);
   // end-change
   return (
     <>
@@ -263,17 +265,15 @@ function StoryCommentsSection({story}) {
         <LoadMoreCommentsButton
           onClick={onLoadMore}
             // change-line
-          disabled={isPending}
+          disabled={isLoadingNext}
         />
       )}
       // change-line
-      {isPending && <CommentsLoadingSpinner />}
+      {isLoadingNext && <SmallSpinner />}
     </>
   );
 }
 ```
-
-Every user action with results that aren’t immediate should be wrapped in a React transition. This allows React to prioritize different updates: for example, if when the data becomes available and React is rendering the new comments, the user clicks on another tab to navigate to a different page, React can interrupt rendering the comments in order to render the new page that the user wanted.
 
 * * *
 
@@ -299,6 +299,7 @@ const NewsfeedQuery = graphql`
 Go ahead and replace it with this:
 
 ```
+// change
 const NewsfeedQuery = graphql`
   query NewsfeedQuery {
     viewer {
@@ -313,6 +314,7 @@ const NewsfeedQuery = graphql`
     }
   }
 `;
+// end-change
 ```
 
 Here we’ve replaced `topStories` with `viewer`’s `newsfeedStories`, adding a `first` argument so that we fetch the first 3 stories initially. Within that we’ve selected the `edge` and then the `node`, which is a `Story` node so we can spread the same `StoryFragment` from before. We also select `id` so that we can use it as a React `key` attribute.
@@ -327,13 +329,16 @@ We need to modify the Newsfeed component to map over the edges and render each n
 
 ```
 function Newsfeed() {
-  const data = useLazyLoadQuery(NewsfeedFragment, {});
+  const data = useLazyLoadQuery(NewsfeedQuery, {});
   // change-line
-  const storyEdges = data.newsfeedStories.edges;
+  const storyEdges = data.viewer.newsfeedStories.edges;
   return (
     <>
+      // change-line
       {storyEdges.map(storyEdge =>
+        // change-line
         <Story key={storyEdge.node.id} story={storyEdge.node} />
+      // change-line
       )}
     </>
   );
@@ -349,22 +354,36 @@ To get this to work, we just need to separate out the contents `NewsfeedQuery` i
 ```
 const NewsfeedQuery = graphql`
   query NewsfeedQuery {
+    // change-line
     ...NewsfeedContentsFragment
   }
 `;
 
+// change-line
 const NewsfeedContentsFragment = graphql`
+  // change-line
   fragment NewsfeedContentsFragment on Query {
+    // change-line
     viewer {
+      // change-line
       newsfeedStories {
+        // change-line
         edges {
+          // change-line
           node {
+            // change-line
             id
+            // change-line
             ...StoryFragment
+          // change-line
           }
+        // change-line
         }
+      // change-line
       }
+    // change-line
     }
+  // change-line
   }
 `;
 ```
@@ -376,7 +395,7 @@ Within `Newsfeed`, we can call both `useLazyLoadQuery` and `useFragment`, though
 ```
 export default function Newsfeed() {
   // change-line
-  const queryData = useLazyLoadQuery(NewsfeedFragment, {});
+  const queryData = useLazyLoadQuery<NewsfeedQueryType>(NewsfeedQuery, {});
   // change-line
   const data = useFragment(NewsfeedContentsFragment, queryData);
   const storyEdges = data.newsfeedStories.edges;
@@ -398,14 +417,21 @@ You should end up with something like this:
 ```
 const NewsfeedContentsFragment = graphql`
   fragment NewsfeedContentsFragment on Query
+    // change-line
     @argumentDefinitions (
+      // change-line
       cursor: { type: "String" }
+      // change-line
       count: { type: "Int", defaultValue: 3 }
+    // change-line
     )
+    // change-line
     @refetchable(queryName: "NewsfeedContentsRefetchQuery")
   {
     viewer {
+      // change-line
       newsfeedStories(after: $cursor, first: $count)
+        // change-line
         @connection(key: "NewsfeedContentsFragment_newsfeedStories")
       {
         edges {
@@ -422,19 +448,32 @@ const NewsfeedContentsFragment = graphql`
 
 ### Step 5 — Call usePaginationFragment
 
-Now we need to modify the `NewsfeedContents` component to call `usePaginationFragment:`
+Now we need to modify the `Newsfeed` component to call `usePaginationFragment:`
 
 ```
-function NewsfeedContents({viewer}) {
+import type { NewsfeedContentsRefetchQuery as NewsfeedContentsRefetchQueryType } from "./__generated__/NewsfeedContentsRefetchQuery.graphql";
+import { NewsfeedContentsFragment$key } from "./__generated__/NewsfeedContentsFragment.graphql";
+
+function Newsfeed() {
+  const queryData = useLazyLoadQuery<NewsfeedQueryType>(
+    NewsfeedQuery,
+    {},
+  );
   // change-line
-  const {data, loadNext} = usePaginationFragment(NewsfeedFragment, viewer);
-  const storyEdges = data.newsfeedStories.edges;
+  const {data, loadNext} = usePaginationFragment<
+    // change-line
+    NewsfeedContentsRefetchQueryType,
+    // change-line
+    NewsfeedContentsFragment$key
+  // change-line
+  >(NewsfeedContentsFragment, queryData);
+  const storyEdges = data.viewer.newsfeedStories.edges;
   return (
-    <>
+    <div className="newsfeed">
       {storyEdges.map(storyEdge =>
         <Story key={storyEdge.node.id} story={storyEdge.node} />
       )}
-    </>
+    </div>
   );
 }
 ```
@@ -444,7 +483,13 @@ function NewsfeedContents({viewer}) {
 We’ve prepared a component called `InfiniteScrollTrigger` that detects when the bottom of the page is reached — we can use this to call `loadNext` at the appropriate time. It needs to know whether more pages exist and whether we’re currently loading the next page — we can retrieve these from the return value of `usePaginationFragment`:
 
 ```
-function NewsfeedContents({query}) {
+import InfiniteScrollTrigger from "./InfiniteScrollTrigger";
+
+function Newsfeed() {
+  const queryData = useLazyLoadQuery<NewsfeedQueryType>(
+    NewsfeedQuery,
+    {},
+  );
   const {
     data,
     loadNext,
@@ -452,15 +497,18 @@ function NewsfeedContents({query}) {
     hasNext,
     // change-line
     isLoadingNext,
-  } = usePaginationFragment(NewsfeedContentsFragment, query);
+  } = usePaginationFragment<
+    NewsfeedContentsRefetchQueryType,
+    NewsfeedContentsFragment$key
+  >(NewsfeedContentsFragment, queryData);
   // change
   function onEndReached() {
-    loadNext(3);
+    loadNext(1);
   }
   // end-change
   const storyEdges = data.viewer.newsfeedStories.edges;
   return (
-    <>
+    <div className="newsfeed">
       {storyEdges.map(storyEdge =>
         <Story key={storyEdge.node.id} story={storyEdge.node} />
       )}
@@ -471,7 +519,7 @@ function NewsfeedContents({query}) {
         isLoadingNext={isLoadingNext}
       />
       // end-change
-    </>
+    </div>
   );
 }
 ```

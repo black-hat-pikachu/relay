@@ -14,7 +14,6 @@ import FbRefreshingUsingRealTimeFeatures from './fb/FbRefreshingUsingRealTimeFea
 import FbRefreshingQueriesUsingUseQueryLoader from './fb/FbRefreshingQueriesUsingUseQueryLoader.md';
 import FbAvoidSuspenseCaution from './fb/FbAvoidSuspenseCaution.md';
 import FbRefreshingQueriesUsingUseLazyLoadQuery from './fb/FbRefreshingQueriesUsingUseLazyLoadQuery.md';
-import OssAvoidSuspenseNote from './OssAvoidSuspenseNote.md';
 
 When referring to **"refreshing a query"**, we mean fetching the *exact* same data that was originally rendered by the query, in order to get the most up-to-date version of that data from the server.
 
@@ -25,9 +24,11 @@ When referring to **"refreshing a query"**, we mean fetching the *exact* same da
 </FbInternalOnly>
 
 <OssOnly>
+
 If we want to keep our data up to date with the latest version from the server, the first thing to consider is if it appropriate to use any real-time features, which can make it easier to automatically keep the data up to date without manually refreshing the data periodically.
 
 One example of this is using [GraphQL Subscriptions](https://relay.dev/docs/guided-tour/updating-data/graphql-subscriptions), which will require additional configuration on your server and [network layer](https://relay.dev/docs/guided-tour/updating-data/graphql-subscriptions/#configuring-the-network-layer).
+
 </OssOnly>
 
 ## When using `useQueryLoader` / `loadQuery`
@@ -123,10 +124,6 @@ In some cases, you might want to avoid showing a Suspense fallback, which would 
 <FbInternalOnly>
   <FbAvoidSuspenseCaution />
 </FbInternalOnly>
-
-<OssOnly>
-  <OssAvoidSuspenseNote />
-</OssOnly>
 
 ```js
 /**

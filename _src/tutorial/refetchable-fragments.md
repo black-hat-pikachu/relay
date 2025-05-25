@@ -50,7 +50,7 @@ You should now see a sidebar with a list of people at the top.
 
 ![Contacts list](/img/docs/tutorial/refetchable-contacts-initial.png)
 
-Have a look at `ContactsList.js` and you’ll find this fragment, which is what selects the list of contacts:
+Have a look at `ContactsList.tsx` and you’ll find this fragment, which is what selects the list of contacts:
 
 ```
 const ContactsListFragment = graphql`
@@ -63,7 +63,7 @@ const ContactsListFragment = graphql`
 `;
 ```
 
-As it happens, the `contacts` field accepts a `search` argument that filters the list. You can try it out by changing `contacts` in this fragment to `contacts(search: "S")`. If you refresh the page, you should see only those contacts that have the letter S in them.
+As it happens, the `contacts` field accepts a `search` argument that filters the list. You can try it out by changing `contacts` in this fragment to `contacts(search: "S")`. If you run `npm run relay` and refresh the page, you should see only those contacts that have the letter S in them.
 
 Our goal, then, will be to hook up a search input so that, when the input changes, we refetch *just this fragment* with a new value for that `search` argument.
 
@@ -336,7 +336,9 @@ import {OssOnly, FbInternalOnly} from 'docusaurus-plugin-internaldocs-fb/interna
 Besides fragments on types that implement `Node`, you can also refetch fragments that are on `Viewer` (since the viewer is assumed to be stable throughout a session) and that are at the top level of a query (since there’s no field above them that could change identity).
 
 <FbInternalOnly>
+
 Meta only: Ents marked with <a href="https://fb.workplace.com/groups/graphql.fyi/permalink/1539541276187011/" target="_blank">GraphQLFetchable</a> can also be refetched.
+
 </FbInternalOnly>
 
 </details>

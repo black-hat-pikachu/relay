@@ -72,14 +72,16 @@ fetchQuery(
 
 <FbInternalOnly>
 
-> The `next` function may be called multiple times when using Relay's [Incremental Data Delivery](../../guides/incremental-data-delivery/) capabilities to receive multiple payloads from the server.
+:::info
+The `next` function may be called multiple times when using Relay's [Incremental Data Delivery](../../guides/incremental-data-delivery/) capabilities to receive multiple payloads from the server.
+:::
 
 </FbInternalOnly>
 
 ### Behavior
 
 * `fetchQuery` will automatically save the fetched data to the in-memory Relay store, and notify any components subscribed to the relevant data.
-* `fetchQuery` will **NOT** retain the data for the query, meaning that it is not guaranteed that the data will remain saved in the Relay store at any point after the request completes. If you wish to make sure that the data is retained outside of the scope of the request, you need to call `environment.retain()` directly on the query to ensure it doesn't get deleted. See our section on [Controlling Relay's GC Policy](../../guided-tour/reusing-cached-data/availability-of-data) for more details.
+* `fetchQuery` will **NOT** retain the data for the query, meaning that it is not guaranteed that the data will remain saved in the Relay store at any point after the request completes. If you wish to make sure that the data is retained outside of the scope of the request, you need to call `environment.retain()` directly on the query to ensure it doesn't get deleted. See our section on [Controlling Relay's GC Policy](../../guided-tour/reusing-cached-data/presence-of-data) for more details.
 * `fetchQuery` will automatically de-dupe identical network requests (same query and variables) that are in flight at the same time, and that were initiated with `fetchQuery`.
 
 

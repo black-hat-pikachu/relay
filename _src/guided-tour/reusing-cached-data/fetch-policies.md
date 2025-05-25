@@ -37,7 +37,7 @@ function AppTabs() {
 The provided `fetchPolicy` will determine:
 
 * *whether* the query should be fulfilled from the local cache, and
-* *whether* a network request should be made to fetch the query from the server, depending on the [availability of the data for that query in the store](../availability-of-data/).
+* *whether* a network request should be made to fetch the query from the server, depending on the availability of the data for that query in the store.
 
 
 By default, Relay will try to read the query from the local cache; if any piece of data for that query is [missing](../presence-of-data/) or [stale](../staleness-of-data/), it will fetch the entire query from the network. This default `fetchPolicy` is called "*store-or-network".*
@@ -50,7 +50,7 @@ Specifically, `fetchPolicy` can be any of the following options: **
 * "store-only": *will* *only* reuse locally cached data, and will *never* send a network request to fetch the query. In this case, the responsibility of fetching the query falls to the caller, but this policy could also be used to read and operate on data that is entirely [local](../../updating-data/local-data-updates/).
 
 
-Note that the `refetch` function discussed in the [Fetching and Rendering Different Data](../../refetching/) section also takes a `fetchPolicy`.
+Note that the `refetch` function discussed in the [Fetching and Rendering Different Data](../list-data/introduction.md) section also takes a `fetchPolicy`.
 
 
 <DocsRating />
